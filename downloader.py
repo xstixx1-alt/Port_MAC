@@ -7,7 +7,16 @@ import time
 import requests
 import random
 import threading
+import platform as _platform
 from requests.adapters import HTTPAdapter
+
+# macOS: yield к event loop чтобы не было spinning cursor
+_IS_MACOS = _platform.system() == "Darwin"
+def _yield():
+    """Даём event loop подышать — предотвращает beach ball на macOS."""
+    if _IS_MACOS:
+        import gevent
+        gevent.sleep(0)
 from urllib3.util.retry import Retry
 
 # Память для предотвращения дубликатов (потокобезопасная)
@@ -210,7 +219,8 @@ def download_file(url, folder, filename, stop_flag, log, progress_fn=None):
                         downloaded += len(chunk)
                         download_state["last_chunk_time"] = now
                         download_state["downloaded"] = downloaded
-                        
+                        _yield()  # macOS: даём event loop подышать
+
                         if progress_fn and total_size > 0 and now - last_speed_time >= 0.5:
                             speed_mb = ((downloaded - last_speed_downloaded) / (1024 * 1024)) / (now - last_speed_time)
                             speed_str = f"{speed_mb:.1f} MB/s"

@@ -2414,6 +2414,9 @@ def download_task(tab_id, prompts, source, save_path, config, trim_start=3, trim
                 futures = {executor.submit(process_item, idx): idx for idx in range(len(queue))}
                 from concurrent.futures import as_completed, TimeoutError as FuturesTimeout
                 for future in as_completed(futures, timeout=None):
+                    # macOS: даём event loop подышать между задачами
+                    if platform.system() == "Darwin":
+                        import gevent; gevent.sleep(0)
                     idx = futures[future]
                     try:
                         future.result(timeout=1200) # Хард-лимит 20 минут
