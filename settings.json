@@ -1,0 +1,19 @@
+{
+    "pexels": "",
+    "pixabay": "",
+    "theme": "dark",
+    "frame_enabled": false,
+    "frame_color": "White",
+    "voicer_voice_presets": [
+        {
+            "id": "162d892684",
+            "name": "ИСТОРИЯ РУ",
+            "engine": "mateo",
+            "standardTemplateUuid": "",
+            "standardTemplateTitle": "",
+            "mateoVoiceId": "21m00Tcm4TlvDq8ikWAM",
+            "mateoVoiceLabel": "Adam — Мужской, глубокий"
+        }
+    ],
+    "prompter_master_prompt": ""
+}

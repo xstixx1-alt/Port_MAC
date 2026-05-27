@@ -1,0 +1,6 @@
+eel
+gevent
+requests
+python-docx
+openai-whisper
+torch

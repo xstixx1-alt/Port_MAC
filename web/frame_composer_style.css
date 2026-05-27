@@ -1,0 +1,223 @@
+/* ═══════════════════════════════════════════
+   FRAME COMPOSER — Красная тема #EF4444
+   ═══════════════════════════════════════════ */
+
+.composer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+    margin-bottom: 20px;
+}
+
+.gpu-badge {
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid;
+}
+.gpu-nvidia { background: rgba(34, 197, 94, 0.1); border-color: #22c55e; color: #22c55e; }
+.gpu-amd    { background: rgba(239, 68, 68, 0.1); border-color: #ef4444; color: #ef4444; }
+.gpu-cpu    { background: rgba(148, 163, 184, 0.1); border-color: #94a3b8; color: #94a3b8; }
+
+/* === ТАБЫ ПРОЕКТОВ === */
+.composer-tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 24px 12px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.composer-tabs-list {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    overflow-x: auto;
+}
+.composer-tab {
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px 10px 0 0;
+    cursor: pointer;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+.composer-tab:hover { background: rgba(239, 68, 68, 0.08); color: #fca5a5; }
+.composer-tab.active {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #EF4444;
+    color: #EF4444;
+    font-weight: 600;
+}
+.composer-tab-close {
+    opacity: 0.5;
+    font-size: 11px;
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+.composer-tab-close:hover { background: rgba(239,68,68,0.2); opacity: 1; }
+.composer-tab-add {
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px dashed rgba(239, 68, 68, 0.3);
+    color: #EF4444;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+.composer-tab-add:hover { background: rgba(239, 68, 68, 0.1); }
+
+/* === КОНТЕНТ === */
+.composer-content { padding: 20px 24px; }
+
+.composer-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(239, 68, 68, 0.08);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.composer-label {
+    display: block;
+    color: #EF4444;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.composer-input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: white;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+.composer-input:focus {
+    outline: none;
+    border-color: #EF4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.composer-btn-secondary {
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.composer-btn-secondary:hover { background: rgba(239, 68, 68, 0.15); border-color: #EF4444; }
+
+/* === СЛОИ === */
+.composer-layer {
+    background: rgba(239, 68, 68, 0.03);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+.composer-layer-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.composer-layer-title {
+    color: #EF4444;
+    font-weight: 700;
+    font-size: 14px;
+}
+.composer-layer-remove {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.composer-layer-remove:hover { background: rgba(239, 68, 68, 0.3); }
+
+.composer-btn-add-layer {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+.composer-btn-add-layer:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
+
+/* === РЕНДЕР === */
+.composer-render-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 14px;
+    text-align: center;
+}
+.composer-btn-render {
+    padding: 14px 40px;
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.composer-btn-render:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5);
+}
+.composer-btn-cancel {
+    padding: 14px 40px;
+    background: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+    border: 1px solid #EF4444;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.composer-progress-bar {
+    width: 100%;
+    height: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 5px;
+    overflow: hidden;
+}
+.composer-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #EF4444, #F87171);
+    width: 0%;
+    transition: width 0.3s;
+}
+.composer-log {
+    margin-top: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    text-align: left;
+}

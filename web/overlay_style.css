@@ -1,0 +1,235 @@
+/* Стили для секции Overlay (DeepSeek Картинки) */
+#page-overlay {
+    background-color: transparent;
+}
+
+.wizard-step {
+    display: none !important;
+    animation: fadeIn 0.3s ease-in-out;
+}
+.wizard-step.active {
+    display: flex !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.overlay-card {
+    background: rgba(26, 26, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.overlay-input {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #e0e0e0;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.overlay-input:focus {
+    outline: none;
+    border-color: #6c5ce7;
+    box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.2);
+}
+
+.overlay-btn {
+    background: linear-gradient(135deg, #7c5cbf 0%, #5c1fde 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.overlay-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(92, 31, 222, 0.4);
+}
+
+.overlay-btn:disabled {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.2);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.overlay-btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.overlay-btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.window-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.window-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+}
+
+.window-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #cdbdff;
+}
+
+.window-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+    font-style: italic;
+}
+
+.prompt-textarea {
+    width: 100%;
+    height: 80px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    color: #fff;
+    font-size: 13px;
+    resize: vertical;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.prompt-textarea:focus {
+    outline: none;
+    border-color: #6c5ce7;
+}
+
+.progress-track {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    height: 8px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.progress-fill {
+    background: #6c5ce7;
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.status-box {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.status-value {
+    font-size: 24px;
+    font-weight: 900;
+    color: #cdbdff;
+    margin-bottom: 4px;
+}
+
+.status-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: bold;
+}
+
+/* ========================================
+   EMERALD COLOR SCHEME for Image Overlay
+   ======================================== */
+
+/* Активный пункт меню */
+#menu-item-overlay.active {
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: #10B981 !important;
+    font-weight: bold;
+}
+
+/* Кнопки */
+#page-overlay .overlay-btn {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+}
+
+#page-overlay .overlay-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+/* Акцентные тексты */
+#page-overlay .text-primary,
+#page-overlay label.text-primary {
+    color: #10B981 !important;
+}
+
+/* Прогресс бар */
+#page-overlay .progress-fill {
+    background: #10B981;
+}
+
+/* Заголовки окон */
+#page-overlay .window-title {
+    color: #10B981;
+}
+
+/* Статус ключа */
+#page-overlay .overlay-key-valid {
+    color: #10B981;
+}
+
+/* Input focus */
+#page-overlay .overlay-input:focus {
+    border-color: #10B981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Card border accent */
+#page-overlay .overlay-card {
+    border-color: rgba(16, 185, 129, 0.08);
+}

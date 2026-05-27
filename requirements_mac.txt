@@ -1,0 +1,9 @@
+# Stocky non Stop — macOS dependencies
+# Install first: brew install ffmpeg python-tk
+
+eel
+gevent
+requests
+python-docx
+openai-whisper
+torch

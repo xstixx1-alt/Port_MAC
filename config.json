@@ -1,0 +1,14 @@
+{
+    "pexels_api_key": "",
+    "pixabay_api_key": "",
+    "pexels_api_keys": [],
+    "pixabay_api_keys": [],
+    "deepseek_api_key": "",
+    "openrouter_api_key": "",
+    "gemini_api_key": "",
+    "elevenlabs_api_key": "",
+    "ai_provider": "deepseek",
+    "deepseek_model": "deepseek-v4-flash",
+    "openrouter_model": "openai/gpt-5.4-nano",
+    "gemini_model": "gemini-3.5-flash"
+}
