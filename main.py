@@ -264,17 +264,34 @@ def get_runtime_diagnostics():
     return collect_runtime_diagnostics()
 
 def log_to_js(tab_id, message, type="info"):
+    """Неблокирующий вызов — спавним отдельный гринлет с таймаутом.
+    Если WebSocket занят/мёртв — НЕ блокирует воркер."""
     try:
-        # УБРАЛИ ВТОРЫЕ СКОБКИ () В КОНЦЕ
-        eel.add_log_entry(tab_id, message, type)
-    except:
+        import gevent
+        def _send():
+            try:
+                with gevent.Timeout(3):
+                    eel.add_log_entry(tab_id, message, type)
+            except Exception:
+                pass
+        gevent.spawn(_send)
+    except Exception:
         pass
 
 def update_ui_queue(tab_id):
+    """Неблокирующий вызов — спавним отдельный гринлет с таймаутом.
+    Если WebSocket занят/мёртв — НЕ блокирует воркер."""
     try:
-        # УБРАЛИ ВТОРЫЕ СКОБКИ () В КОНЦЕ
-        eel.update_queue(tab_id, get_tab_queue(tab_id))
-    except:
+        import gevent
+        snapshot = list(get_tab_queue(tab_id))
+        def _send():
+            try:
+                with gevent.Timeout(3):
+                    eel.update_queue(tab_id, snapshot)
+            except Exception:
+                pass
+        gevent.spawn(_send)
+    except Exception:
         pass
 
 @eel.expose
