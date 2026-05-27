@@ -283,7 +283,11 @@ def download_file(url, folder, filename, stop_flag, log, progress_fn=None):
 
 def _safe_api_request(url, params=None, headers=None, log=None, label="API"):
     for attempt in range(2):
-        local_session = get_robust_session()
+        # macOS: используем общую сессию (не дёргаем сетевой стек)
+        if _IS_MACOS:
+            local_session = get_shared_session()
+        else:
+            local_session = get_robust_session()
         try:
             r = local_session.get(url, params=params, headers=headers, timeout=(5, 10))
             r.raise_for_status()
@@ -309,8 +313,10 @@ def _safe_api_request(url, params=None, headers=None, log=None, label="API"):
             if log: log(f"[{label}] API ошибка: {e}", "ERROR")
             return {"success": False, "data": None, "status_code": None, "error_type": "unknown", "error": str(e)}
         finally:
-            try: local_session.close()
-            except: pass
+            # macOS: общую сессию НЕ закрываем
+            if not _IS_MACOS:
+                try: local_session.close()
+                except: pass
     return {"success": False, "data": None, "status_code": None, "error_type": "network", "error": "request_failed"}
 
 def _pick_unique_item(items, id_key='id', top_n=5):
