@@ -4827,6 +4827,7 @@
         let isConfirmMode = false;
         let pendingWorkers = 1;
         let isRenderingBatch = false; // Добавили переменную для рендера
+        let _queuePollInterval = null; // polling очереди (backup для Eel push)
 
         eel.expose(add_log_entry);
         function add_log_entry(tab_id, message, type) {
@@ -5777,6 +5778,25 @@
             const clipRules = getValidatedClipRulesOrAlert();
             if (!clipRules) return;
             eel.start_batch_download(activeTabId, promptsToDownload, currentSource, currentPath, 0, 0, workers, clipRules, getActiveStockPool());
+
+            // POLLING: подтягиваем очередь каждую секунду на случай если Eel push не дошёл
+            if (!_queuePollInterval) {
+                _queuePollInterval = setInterval(() => {
+                    let anyActive = false;
+                    Object.keys(tabs).forEach(tid => {
+                        if (tabs[tid] && tabs[tid].isDownloading) {
+                            anyActive = true;
+                            eel.get_queue_snapshot(tid)(function(q) {
+                                if (q && Array.isArray(q)) {
+                                    tabs[tid].queue = q;
+                                    if (activeTabId === tid) renderQueue();
+                                }
+                            });
+                        }
+                    });
+                    if (!anyActive) { clearInterval(_queuePollInterval); _queuePollInterval = null; }
+                }, 1000);
+            }
         }
 
         // НОВАЯ ФУНКЦИЯ ДЛЯ ЗАПУСКА ВСЕХ ПРОЕКТОВ
@@ -5914,6 +5934,10 @@
                 isDownloading = false;
                 renderQueue();
                 updateButtonUI();
+            }
+            // Останавливаем polling
+            if (!Object.values(tabs).some(t => t.isDownloading) && _queuePollInterval) {
+                clearInterval(_queuePollInterval); _queuePollInterval = null;
             }
             // Запускаем проверку автоматики
             handleAutomation(tab_id);
@@ -6484,6 +6508,25 @@
             const clipRules = getValidatedClipRulesOrAlert();
             if (!clipRules) return;
             eel.start_batch_download(activeTabId, promptsToDownload, currentSource, currentPath, 0, 0, workers, clipRules, getActiveStockPool());
+
+            // POLLING: подтягиваем очередь каждую секунду
+            if (!_queuePollInterval) {
+                _queuePollInterval = setInterval(() => {
+                    let anyActive = false;
+                    Object.keys(tabs).forEach(tid => {
+                        if (tabs[tid] && tabs[tid].isDownloading) {
+                            anyActive = true;
+                            eel.get_queue_snapshot(tid)(function(q) {
+                                if (q && Array.isArray(q)) {
+                                    tabs[tid].queue = q;
+                                    if (activeTabId === tid) renderQueue();
+                                }
+                            });
+                        }
+                    });
+                    if (!anyActive) { clearInterval(_queuePollInterval); _queuePollInterval = null; }
+                }, 1000);
+            }
         }
 
         window.startDownloadAll = async function () {
@@ -6686,6 +6729,10 @@
                 isDownloading = false;
                 renderQueue();
                 updateButtonUI();
+            }
+            // Останавливаем polling
+            if (!Object.values(tabs).some(t => t.isDownloading) && _queuePollInterval) {
+                clearInterval(_queuePollInterval); _queuePollInterval = null;
             }
             // Запускаем проверку автоматики
             handleAutomation(tab_id);

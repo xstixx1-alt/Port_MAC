@@ -295,6 +295,11 @@ def update_ui_queue(tab_id):
         pass
 
 @eel.expose
+def get_queue_snapshot(tab_id):
+    """JS polling endpoint — фронтенд сам спрашивает статус очереди."""
+    return get_tab_queue(tab_id)
+
+@eel.expose
 def get_config():
     defaults = {
         "pexels_api_key": "",
