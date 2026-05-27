@@ -19,6 +19,26 @@ echo "  Stocky non Stop — macOS Installer"
 echo "=========================================="
 echo ""
 
+# --- 0. Удаляем старую версию если есть ---
+echo -e "${YELLOW}[0/5]${NC} Проверяю старые установки..."
+FOUND_OLD=0
+for search_dir in ~/Desktop ~/Downloads ~; do
+    # Ищем папки со старыми версиями (но НЕ текущую)
+    for old_dir in "$search_dir"/Port_MAC* "$search_dir"/Stocky*; do
+        [ -d "$old_dir" ] || continue
+        # Не трогаем текущую папку
+        [ "$(cd "$old_dir" && pwd)" = "$(pwd)" ] && continue
+        echo "   Найдена старая версия: $old_dir"
+        rm -rf "$old_dir"
+        FOUND_OLD=1
+    done
+done
+if [ $FOUND_OLD -eq 1 ]; then
+    echo -e "${GREEN}[0/5]${NC} Старые версии удалены"
+else
+    echo -e "${GREEN}[0/5]${NC} Старых версий не найдено"
+fi
+
 # --- 1. Homebrew ---
 if ! command -v brew &>/dev/null; then
     echo -e "${YELLOW}[1/5]${NC} Устанавливаю Homebrew..."
