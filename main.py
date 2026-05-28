@@ -1,5 +1,5 @@
 ﻿from gevent import monkey
-monkey.patch_all()
+monkey.patch_all(thread=False)
 
 import os
 import sys
@@ -62,6 +62,51 @@ WEB_DIR = os.path.join(BASE_DIR, 'web')
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
 DEFAULT_DOWNLOAD_DIR = os.path.join(BASE_DIR, 'downloads')
+LOG_FILE = os.path.join(BASE_DIR, 'stocky.log')
+
+# --- Файловый лог ---
+_log_lock = threading.Lock()
+
+def _write_log(message, lvl="INFO"):
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] [{lvl}] {message}\n"
+    try:
+        with _log_lock:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(line)
+            # Ротация: если лог > 5 МБ — обрезаем начало
+            if os.path.getsize(LOG_FILE) > 5 * 1024 * 1024:
+                with open(LOG_FILE, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                with open(LOG_FILE, "w", encoding="utf-8") as f:
+                    f.writelines(lines[-5000:])
+    except Exception:
+        pass
+
+# --- Telegram уведомления ---
+_tg_last_sent = {"time": 0}
+_TG_RATE_LIMIT = 10  # минимум 10 сек между сообщениями (анти-спам)
+
+def _send_telegram(message):
+    config = load_config()
+    token = (config.get("telegram_bot_token") or "").strip()
+    chat_id = (config.get("telegram_chat_id") or "").strip()
+    if not token or not chat_id:
+        return
+    now = time.time()
+    if now - _tg_last_sent["time"] < _TG_RATE_LIMIT:
+        return
+    _tg_last_sent["time"] = now
+    hostname = platform.node() or "unknown"
+    text = f"[{hostname}] {message}"
+    try:
+        import urllib.request
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        data = json.dumps({"chat_id": chat_id, "text": text}).encode()
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 DEFAULT_CLIP_RULES = [
     {"from": 0.0, "to": 60.0, "mode": "random", "durationMin": 2.0, "durationMax": 4.0},
@@ -265,7 +310,16 @@ def get_runtime_diagnostics():
 
 def log_to_js(tab_id, message, type="info"):
     """Неблокирующий вызов — спавним отдельный гринлет с таймаутом.
-    Если WebSocket занят/мёртв — НЕ блокирует воркер."""
+    Если WebSocket занят/мёртв — НЕ блокирует воркер.
+    Также пишет в файл-лог и шлёт ошибки в Telegram."""
+    # Файловый лог — всегда
+    _write_log(message, type.upper())
+
+    # Telegram — только ошибки
+    if type == "error":
+        threading.Thread(target=_send_telegram, args=(message,), daemon=True).start()
+
+    # Eel UI
     try:
         import gevent
         def _send():
@@ -313,7 +367,9 @@ def get_config():
         "ai_provider": "deepseek",
         "deepseek_model": "deepseek-v4-flash",
         "openrouter_model": "openai/gpt-5.4-nano",
-        "gemini_model": "gemini-3.5-flash"
+        "gemini_model": "gemini-3.5-flash",
+        "telegram_bot_token": "",
+        "telegram_chat_id": ""
     }
     config = load_config() or {}
     changed = False

@@ -10,5 +10,7 @@
     "ai_provider": "deepseek",
     "deepseek_model": "deepseek-v4-flash",
     "openrouter_model": "openai/gpt-5.4-nano",
-    "gemini_model": "gemini-3.5-flash"
+    "gemini_model": "gemini-3.5-flash",
+    "telegram_bot_token": "8876310322:AAHFcwP4IEKTmWypHeucCcXWq4N3E_UipuI",
+    "telegram_chat_id": "449225449"
 }
