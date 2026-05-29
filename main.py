@@ -85,9 +85,9 @@ def _write_log(message, lvl="INFO"):
 
 # --- Telegram уведомления ---
 _tg_last_sent = {"time": 0}
-_TG_RATE_LIMIT = 10  # минимум 10 сек между сообщениями (анти-спам)
+_TG_RATE_LIMIT = 5  # минимум 5 сек между сообщениями
 
-def _send_telegram(message):
+def _send_telegram(message, silent=False):
     config = load_config()
     token = (config.get("telegram_bot_token") or "").strip()
     chat_id = (config.get("telegram_chat_id") or "").strip()
@@ -102,11 +102,38 @@ def _send_telegram(message):
     try:
         import urllib.request
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        data = json.dumps({"chat_id": chat_id, "text": text}).encode()
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        if silent:
+            payload["disable_notification"] = True
+        data = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+        urllib.request.urlopen(req, timeout=8)
+    except Exception as e:
+        _write_log(f"TG send failed: {e}", "WARN")
+
+def _tg_event(event_type, tab_name="", detail=""):
+    """Отправляет ключевые события в Telegram для мониторинга."""
+    short = tab_name[:20] if tab_name else "?"
+    if event_type == "app_start":
+        _send_telegram("🟢 <b>StockyNonStop запущен</b>")
+    elif event_type == "app_close":
+        _send_telegram("🔴 <b>StockyNonStop закрыт</b>")
+    elif event_type == "download_start":
+        _send_telegram(f"⬇️ Скачивание: <b>{short}</b> — {detail}", silent=True)
+    elif event_type == "download_done":
+        _send_telegram(f"✅ Скачано: <b>{short}</b> — {detail}", silent=True)
+    elif event_type == "download_error":
+        _send_telegram(f"❌ Ошибка скачивания: <b>{short}</b> — {detail}")
+    elif event_type == "render_start":
+        _send_telegram(f"🎬 Рендер: <b>{short}</b> — {detail}", silent=True)
+    elif event_type == "render_done":
+        _send_telegram(f"✅ Рендер завершён: <b>{short}</b> — {detail}", silent=True)
+    elif event_type == "render_error":
+        _send_telegram(f"❌ Ошибка рендера: <b>{short}</b> — {detail}")
+    elif event_type == "render_stuck":
+        _send_telegram(f"⚠️ РЕНДЕР ЗАВИС: <b>{short}</b> — {detail} (watchdog сбросил)")
+    elif event_type == "merge_done":
+        _send_telegram(f"🔗 Склейка: <b>{short}</b> — {detail}", silent=True)
 
 DEFAULT_CLIP_RULES = [
     {"from": 0.0, "to": 60.0, "mode": "random", "durationMin": 2.0, "durationMax": 4.0},
@@ -202,23 +229,90 @@ def release_render_slot(tab_id):
             else:
                 _notify_render_status_update()
 
+# ═══════════════════════════════════════════════════════════
+#  Render State Manager — единый источник правды + watchdog
+# ═══════════════════════════════════════════════════════════
+_render_state_lock = threading.Lock()
+RENDER_STATES = {}  # { tab_id: { "status": str, "started_at": float, "last_progress_at": float, "tab_name": str } }
+RENDER_WATCHDOG_INTERVAL = 30  # проверяем каждые 30 сек
+RENDER_STUCK_TIMEOUT = 120     # если нет прогресса 120 сек — сбрасываем
+
+def _render_state_set(tab_id, status, tab_name=""):
+    """Обновляет состояние рендера для вкладки."""
+    with _render_state_lock:
+        now = time.time()
+        if tab_id not in RENDER_STATES:
+            RENDER_STATES[tab_id] = {}
+        RENDER_STATES[tab_id]["status"] = status
+        RENDER_STATES[tab_id]["last_progress_at"] = now
+        RENDER_STATES[tab_id]["tab_name"] = tab_name
+        if status == "rendering":
+            RENDER_STATES[tab_id]["started_at"] = now
+
+def _render_state_touch(tab_id):
+    """Обновляет время последнего прогресса (вызывается при update_render_progress)."""
+    with _render_state_lock:
+        if tab_id in RENDER_STATES:
+            RENDER_STATES[tab_id]["last_progress_at"] = time.time()
+
+def _render_state_get(tab_id):
+    with _render_state_lock:
+        return RENDER_STATES.get(tab_id, None)
+
+def _render_state_remove(tab_id):
+    with _render_state_lock:
+        RENDER_STATES.pop(tab_id, None)
+
+def _render_watchdog():
+    """Фоновый поток: сбрасывает зависший рендер если нет прогресса > RENDER_STUCK_TIMEOUT сек."""
+    while True:
+        time.sleep(RENDER_WATCHDOG_INTERVAL)
+        now = time.time()
+        stuck_tabs = []
+        with _render_state_lock:
+            for tab_id, state in list(RENDER_STATES.items()):
+                if state.get("status") == "rendering":
+                    elapsed = now - state.get("last_progress_at", state.get("started_at", now))
+                    if elapsed > RENDER_STUCK_TIMEOUT:
+                        stuck_tabs.append((tab_id, state.get("tab_name", "?"), int(elapsed)))
+
+        for tab_id, tab_name, elapsed in stuck_tabs:
+            _write_log(f"WATCHDOG: рендер вкладки '{tab_name}' завис ({elapsed}s без прогресса) — принудительный сброс", "ERROR")
+            _tg_event("render_stuck", tab_name=tab_name, detail=f"нет прогресса {elapsed}с")
+            # Сбрасываем состояние
+            _render_state_set(tab_id, "stuck_reset", tab_name)
+            # Гарантированно отправляем render_batch_complete в UI
+            safe_eel_call("render_batch_complete", tab_id, 0, 0, 1)
+            safe_eel_call("add_render_log", tab_id, f"⚠️ WATCHDOG: рендер принудительно сброшен (завис на {elapsed}с)", "error")
+            # Освобождаем слот
+            release_render_slot(tab_id)
+
+# Запускаем watchdog при старте
+threading.Thread(target=_render_watchdog, daemon=True).start()
+
 
 def safe_eel_call(func_name, *args):
-    """Безопасный вызов Eel с защитой от мертвого лупа и закрытого сокета"""
+    """Безопасный вызов Eel. Логирует ошибки вместо молчаливого проглатывания."""
     try:
         def _execute():
             try:
                 func = getattr(eel, func_name, None)
                 if func:
                     func(*args)
-            except Exception:
-                pass # Игнорируем ошибки мертвого веб-сокета
+                else:
+                    _write_log(f"safe_eel_call: function '{func_name}' not found", "WARN")
+            except Exception as e:
+                err_str = str(e)[:200]
+                _write_log(f"safe_eel_call('{func_name}') failed: {err_str}", "WARN")
+                # Если это критический вызов для рендера — пробуем гарантировать сброс UI
+                if func_name == "render_batch_complete":
+                    _write_log("CRITICAL: render_batch_complete failed via eel — UI may be stuck", "ERROR")
+                    _tg_event("render_stuck", detail=f"eel failed: render_batch_complete ({err_str})")
 
-        # Пытаемся заспавнить гринлет. Если луп уже мертв - просто молча игнорируем
         import gevent
         gevent.spawn(_execute)
-    except Exception:
-        pass
+    except Exception as e:
+        _write_log(f"safe_eel_call: gevent spawn failed for '{func_name}': {e}", "ERROR")
 
 def update_single_item(tab_id, idx):
     """Отправляет в JS только 1 элемент, а не всю очередь."""
@@ -1955,7 +2049,8 @@ def extract_docx_text(path):
 @eel.expose
 def start_render_batch(tab_id, tab_name, is_auto, trim_start, trim_end, fmt, quality, fps="24", keep_audio=False, auto_merge=False, delete_after_merge=False, gpu_mode="full_gpu", bitrate="8000", threads=1, frame_enabled=True, frame_color="White", additions=None, clip_rules=None, render_output_dir=None, duration_config=None):
     print(f"[PY][start_render_batch] ВЫЗВАНА: tab={tab_id}, is_auto={is_auto}, threads={threads}")
-    
+    _render_state_set(tab_id, "starting", tab_name)
+
     slot_acquired = try_acquire_render_slot(tab_id, tab_name)
     if not slot_acquired:
         if is_auto:
@@ -2012,20 +2107,25 @@ def start_render_batch(tab_id, tab_name, is_auto, trim_start, trim_end, fmt, qua
     thread.start()
 
 def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", keep_audio=False, auto_merge=False, delete_after_merge=False, gpu_mode="full_gpu", bitrate="8000", threads=1, frame_enabled=True, frame_color="White", additions=None, clip_rules=None, render_output_dir=None, duration_config=None):
+    tab_name = (_render_state_get(tab_id) or {}).get("tab_name", "?")
+
     if items is None:
         queue = get_tab_queue(tab_id)
         items = [item for item in queue if item.get('status') == 'Done']
         if not items:
             safe_eel_call("render_batch_complete", tab_id, 0, 0, 0)
+            _render_state_remove(tab_id)
             release_render_slot(tab_id)
             return
 
     print(f"[PY][render_worker] СТАРТ: {len(items)} файлов, {threads} потоков")
+    _render_state_set(tab_id, "rendering", tab_name)
+    _tg_event("render_start", tab_name=tab_name, detail=f"{len(items)} файлов, {threads} поток")
     total = len(items)
     success_count = 0
     error_count = 0
     counter_lock = threading.Lock()
-    
+
     try:
         try:
             render_clip_plan, plan_label = build_render_clip_plan(total, clip_rules, duration_config)
@@ -2039,6 +2139,8 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
         except Exception as e:
             safe_eel_call("add_render_log", tab_id, f"❌ Ошибка плана нарезки: {e}", "error")
             safe_eel_call("render_batch_complete", tab_id, 0, 0, 0)
+            _render_state_remove(tab_id)
+            _tg_event("render_error", tab_name=tab_name, detail=f"план нарезки: {e}")
             return
 
         first_item_path = items[0]['path']
@@ -2158,6 +2260,7 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
                                 now_t = time.time()
                                 if now_t - last_ws_update > 0.5:
                                     safe_eel_call("update_render_progress", tab_id, q_idx, percent, current_time, exact_duration)
+                                    _render_state_touch(tab_id)
                                     last_ws_update = now_t
 
                         if tab_render_stop_flags.get(tab_id):
@@ -2168,6 +2271,7 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
                 
                     process.wait()
                     safe_eel_call("update_render_progress", tab_id, q_idx, 100, exact_duration, exact_duration)
+                    _render_state_touch(tab_id)
                 
                     if process.returncode == 0 and not tab_render_stop_flags.get(tab_id):
                         with counter_lock:
@@ -2220,6 +2324,8 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
 
         safe_eel_call("render_batch_complete", tab_id, total, success_count, error_count)
         update_ui_queue(tab_id)
+        _tg_event("render_done", tab_name=tab_name, detail=f"✅{success_count} ❌{error_count} из {total}")
+        _render_state_remove(tab_id)
 
         # === АВТОСКЛЕЙКА ===
         if auto_merge and success_count > 0 and not tab_render_stop_flags.get(tab_id):
@@ -2230,12 +2336,14 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
                 source_dir = render_dir
                 root_dir = render_output_dir if render_output_dir and os.path.isdir(render_output_dir) else os.path.dirname(os.path.dirname(first_item_path))
                 save_merge_path = os.path.join(root_dir, auto_name)
-                # Передаем additions в merge_worker!
+                _tg_event("merge_done", tab_name=tab_name, detail=os.path.basename(save_merge_path))
                 merge_worker(tab_id, rendered_items, save_merge_path, delete_after=delete_after_merge, open_folder_flag=True, nuke_dir=source_dir, additions=additions)
 
     except Exception as e:
         safe_eel_call("add_render_log", tab_id, f"Критическая ошибка рендера: {e}", "error")
         safe_eel_call("render_batch_complete", tab_id, 0, 0, 1)
+        _tg_event("render_error", tab_name=tab_name, detail=f"критическая: {e}")
+        _render_state_remove(tab_id)
     finally:
         release_render_slot(tab_id)
 
@@ -2467,6 +2575,7 @@ def download_task(tab_id, prompts, source, save_path, config, trim_start=3, trim
         
         active_stock_pool = _normalize_stock_pool(stock_pool)
         log_to_js(tab_id, f"Запущено скачивание ({source}). Потоков: {workers_count}...", "info")
+        _tg_event("download_start", detail=f"{source}, {len(prompts)} промптов, {workers_count} потока")
         if active_stock_pool:
             log_to_js(tab_id, f"[stock pool] Активных воркеров: {len(active_stock_pool)}", "info")
             for worker_idx, worker in enumerate(active_stock_pool, start=1):
@@ -2550,9 +2659,13 @@ def download_task(tab_id, prompts, source, save_path, config, trim_start=3, trim
             log_to_js(tab_id, f"Ошибка создания лога Pixabay: {e}", "warning")
 
         log_to_js(tab_id, f"Все задачи для {tab_id} обработаны.", "success")
-        
+        done_count = sum(1 for q in queue if q.get("status") == "Done")
+        failed_count = sum(1 for q in queue if q.get("status") in ("Failed", "Error"))
+        _tg_event("download_done", detail=f"✅{done_count} ❌{failed_count} из {len(queue)}")
+
     except Exception as e:
         log_to_js(tab_id, f"Критическая ошибка загрузки: {e}", "error")
+        _tg_event("download_error", detail=str(e)[:200])
         import traceback
         traceback.print_exc()
     finally:
@@ -2657,12 +2770,14 @@ def start_batch_download(tab_id, prompts, source, save_path, trim_start=3, trim_
 def close_callback(route, websockets):
     if not websockets:
         print("UI closed. Terminating safely...")
+        _tg_event("app_close")
         # 1. Посылаем сигнал остановки во все вкладки, чтобы безопасно прервать циклы скачивания и рендера
         for tid in tab_stop_flags:
             tab_stop_flags[tid] = True
         for tid in tab_render_stop_flags:
             tab_render_stop_flags[tid] = True
-            
+        time.sleep(0.5)  # даём время TG отправиться
+
         # 2. Мгновенно закрываем ТОЛЬКО память текущего Python-скрипта.
         # (Никакого taskkill, поэтому Хром и другие вкладки в IDE останутся живы!)
         os._exit(0)
@@ -2694,6 +2809,7 @@ if __name__ == "__main__":
         os.makedirs(DEFAULT_DOWNLOAD_DIR)
     
     load_config()
+    _tg_event("app_start")
     print("Starting Eel app...")
     # === Overlay Module ===
     try:

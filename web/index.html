@@ -4828,6 +4828,32 @@
         let pendingWorkers = 1;
         let isRenderingBatch = false; // Добавили переменную для рендера
         let _queuePollInterval = null; // polling очереди (backup для Eel push)
+        let _renderWatchdogJS = null; // JS-side watchdog: auto-reset if stuck
+        let _renderLastProgressJS = 0;
+
+        function startJSRenderWatchdog() {
+            stopJSRenderWatchdog();
+            _renderLastProgressJS = Date.now();
+            _renderWatchdogJS = setInterval(() => {
+                if (!isRenderingBatch) { stopJSRenderWatchdog(); return; }
+                const elapsed = (Date.now() - _renderLastProgressJS) / 1000;
+                if (elapsed > 180) {  // 3 минуты без обновления прогресса
+                    console.error('[WATCHDOG JS] Render stuck for ' + elapsed + 's — forcing reset');
+                    if (activeTabId && tabs[activeTabId]) tabs[activeTabId].isRendering = false;
+                    resetRenderUI();
+                    add_log_entry(activeTabId || '?', '⚠️ UI watchdog: рендер принудительно сброшен (нет прогресса 3 мин)', 'error');
+                    stopJSRenderWatchdog();
+                }
+            }, 30000);  // проверяем каждые 30 сек
+        }
+
+        function stopJSRenderWatchdog() {
+            if (_renderWatchdogJS) { clearInterval(_renderWatchdogJS); _renderWatchdogJS = null; }
+        }
+
+        function touchJSRenderWatchdog() {
+            _renderLastProgressJS = Date.now();
+        }
 
         eel.expose(add_log_entry);
         function add_log_entry(tab_id, message, type) {
@@ -5455,6 +5481,7 @@
             isRenderingBatch = true;
             tab.isRendering = true;
             updateRenderButtonUI(true);
+            startJSRenderWatchdog();
 
             clearRenderLog();
             add_render_log(activeTabId, "Запуск пакетного рендеринга...", "info");
@@ -5527,10 +5554,12 @@
             isRenderingBatch = false;
             if (activeTabId && tabs[activeTabId]) tabs[activeTabId].isRendering = false;
             updateRenderButtonUI(false);
+            stopJSRenderWatchdog();
         }
 
         eel.expose(update_batch_progress);
         function update_batch_progress(tab_id, done_count, total_count) {
+            touchJSRenderWatchdog();
             if (activeTabId === tab_id) {
                 const renderTopBar = document.getElementById('render-progress-bar');
                 const renderTopText = document.getElementById('render-progress-text');
@@ -5551,6 +5580,7 @@
 
                 tabs[tab_id].queue[idx].progress = percent;
                 tabs[tab_id].queue[idx].status = 'Rendering';
+                touchJSRenderWatchdog();  // <-- watchdog: есть прогресс
 
                 if (activeTabId === tab_id) {
                     // Плавно двигаем нижнюю полосу без задержек
@@ -5683,6 +5713,7 @@
 
         eel.expose(update_render_current);
         function update_render_current(tab_id, name, cur, tot) {
+            touchJSRenderWatchdog();
             if (activeTabId === tab_id) {
                 document.getElementById('current-render-file').textContent = name;
             }
