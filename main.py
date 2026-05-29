@@ -1643,6 +1643,11 @@ def apply_additions(tab_id, input_video, output_video, additions, shift_sec=0.0,
     while True:
         line = process.stderr.readline()
         if not line and process.poll() is not None: break
+        # macOS: отдаём управление gevent loop для доставки eel-вызовов
+        try:
+            import gevent; gevent.sleep(0)
+        except Exception:
+            pass
         if line:
             stderr_lines.append(line)
             l = line.lower()
@@ -1948,6 +1953,11 @@ def merge_worker(tab_id, items, output_path, delete_after=False, open_folder_fla
         while True:
             line = process.stderr.readline()
             if not line and process.poll() is not None: break
+            # macOS: отдаём управление gevent loop
+            try:
+                import gevent; gevent.sleep(0)
+            except Exception:
+                pass
             if line:
                 stderr_lines.append(line)
                 if "time=" in line:
@@ -2126,6 +2136,9 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
     error_count = 0
     counter_lock = threading.Lock()
 
+    # Сразу отправляем начальный прогресс 0/N, чтобы UI не показывал "0" без контекста
+    safe_eel_call("update_batch_progress", tab_id, 0, total)
+
     try:
         try:
             render_clip_plan, plan_label = build_render_clip_plan(total, clip_rules, duration_config)
@@ -2251,6 +2264,12 @@ def render_worker(tab_id, items, trim_start, trim_end, fmt, quality, fps="24", k
                         if line:
                             stderr_tail.append(line.strip())
                             stderr_tail = stderr_tail[-12:]
+                        # macOS: отдаём управление gevent loop, чтобы eel-вызовы дошли до JS
+                        # Без этого readline блокирует loop → курсор крутится + прогресс 0%
+                        try:
+                            import gevent; gevent.sleep(0)
+                        except Exception:
+                            pass
                         if line and "time=" in line:
                             time_match = re.search(r'time=(\d+):(\d+):(\d+\.\d+)', line)
                             if time_match and exact_duration > 0:
